@@ -15,6 +15,7 @@ endif()
 endif()
 
 set(EIGENROOT "$ENV{EIGENROOT}")
+set(MKLROOT "$ENV{MKLROOT}")
 
 if(EIGENROOT)
   find_path(EIGEN_INCLUDE_DIR signature_of_eigen3_matrix_library PATHS ${EIGENROOT}/include PATH_SUFFIXES eigen3)
@@ -24,20 +25,20 @@ else()
   message(FATAL "Eigen not found")
 endif()
 
-#find_path(MKL_INCLUDE_DIR mkl_cblas.h PATHS ${MKLROOT} PATH_SUFFIXES include)
-#find_library(MKL_LIBRARY
-#             NAMES mklml_intel
-#             PATHS ${MKLROOT}/lib)
-#if(MKLROOT)
-#  message(STATUS "Found MKL (include: ${MKL_INCLUDE_DIR}")
-#  include_directories(${MKL_INCLUDE_DIR})
-#else()
-#  message(FATAL "MKL not found")
-#endif()
+if(MKLROOT)
+  find_path(MKL_INCLUDE_DIR mkl_cblas.h PATHS ${MKLROOT} PATH_SUFFIXES include)
+  find_library(MKL_LIBRARY
+                 NAMES mklml_intel
+                 PATHS ${MKLROOT}/lib)
+  message(STATUS "Found MKL (include: ${MKL_INCLUDE_DIR}")
+  include_directories(${MKL_INCLUDE_DIR})
+else()
+  message(FATAL "MKL not found")
+endif()
 
 add_executable(attention attention.cpp)
 
 add_definitions(-Wall)
 
 #target_link_libraries(attention ${MKL_LIBRARY} )
-target_link_libraries(attention)
+target_link_libraries(attention ${MKL_LIBRARY})
