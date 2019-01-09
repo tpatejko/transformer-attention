@@ -1,3 +1,5 @@
+#pragma once
+
 #include <vector>
 #include <mkl_cblas.h>
 
@@ -125,79 +127,14 @@ public:
   }
 };
 
-class new_matmul1_op {
-  void sgemm(CBLAS_TRANSPOSE a_transposed, CBLAS_TRANSPOSE b_transposed,
-             int m, int n, int k,
-             float alpha,
-             const float* a, int lda,
-             const float* b, int ldb,
-             float beta,
-             float* c, int ldc) {
-    cblas_sgemm(CblasRowMajor, a_transposed, b_transposed,
-          m, n, k,
-          alpha,
-          a, lda,
-          b, ldb, beta,
-          c, ldc);
-  }
-
- public:
-  tensor operator()(const tensor& a, const tensor& b, bool transposed_a, bool transposed_b) {
-    tensor c({12, 8*12});
-
-    for (int i = 0; i < 8; i++) {
-      sgemm(CblasNoTrans, CblasTrans,
-            12, 12, 64,
-            1.0,
-            a.ptr() + i*64, 512,
-            b.ptr() + i*64, 512,
-            0.0,
-            c.ptr() + i*12, 96);
-    }
-
-    return c;
-  }
-};
-
-class new_matmul2_op : public matmul_op {
-  void sgemm(CBLAS_TRANSPOSE a_transposed, CBLAS_TRANSPOSE b_transposed,
-             int m, int n, int k,
-             float alpha,
-             const float* a, int lda,
-             const float* b, int ldb,
-             float beta,
-             float* c, int ldc) {
-    cblas_sgemm(CblasRowMajor, a_transposed, b_transposed,
-          m, n, k,
-          alpha,
-          a, lda,
-          b, ldb, beta,
-          c, ldc);
-  }
- 
- public:
-  tensor operator()(const tensor& a, const tensor& b, bool transposed_a, bool transposed_b) {
-    //tensor c({12, 8*12});
-    tensor c({12, 8*64});
-
-    for (int i = 0; i < 8; i++) {
-      sgemm(CblasNoTrans, CblasNoTrans,
-            12, 64, 12,
-            1.0,
-            a.ptr() + i*12, 96,
-            b.ptr() + i*64, 512,
-            0.0,
-            c.ptr() + i*64, 512);
-    }
-
-    return c;
-  }
-
-};
-
-template<typename matmul_t>
-tensor matmul(const tensor& a, const tensor& b, bool transpose_a, bool transpose_b) {
+template<typename matmul_t, typename... arg_ts>
+tensor matmul(const tensor& a, const tensor& b, arg_ts... args) {
   matmul_t m;
-  return m(a, b, transpose_a, transpose_b);
+  if constexpr (sizeof...(arg_ts) != 0) {
+    return m(a, b, args...);
+  } else {
+    return m(a, b);
+  }
+
 }
 

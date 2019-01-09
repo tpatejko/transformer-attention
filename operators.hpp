@@ -6,6 +6,7 @@
 
 #include <unsupported/Eigen/CXX11/Tensor>
 
+#include "tensor.hpp"
 #include "matmul.hpp"
 
 tensor reshape(const tensor& src, const std::vector<size_t>& dims) {
@@ -68,7 +69,7 @@ tensor split_heads(const tensor& src, const std::vector<size_t>& dst_dims) {
 
 tensor combine_heads(const tensor& src) {
   auto t = transpose(src, {1, 0, 2});
-  return reshape(t, {t.shape(0), t.shape(1)*t.shape(2)});
+  return reshape(t, {t.shape(0), t.shape(1) * t.shape(2)});
 }
 
 tensor scale(const tensor& src, float scale) {
@@ -109,8 +110,8 @@ class softmax_op {
     Eigen::DSizes<size_t, 2> one_by_class{1, num_classes};
 
     auto value_clip = [](const float& x) -> float {
-			float threshold = -64.0;
-			return x < threshold ? threshold : x;
+      float threshold = -64.0;
+      return x < threshold ? threshold : x;
     };
 
     auto shifted_logits = (logits - logits.maximum(along_class)
