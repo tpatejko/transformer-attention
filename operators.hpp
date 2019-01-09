@@ -64,12 +64,12 @@ tensor transpose(const tensor& src, const std::vector<size_t>& orders) {
 }
 
 tensor split_heads(const tensor& src, const std::vector<size_t>& dst_dims) {
-  return transpose(reshape(src, dst_dims), {1, 0, 2});
+  return transpose(reshape(src, dst_dims), {0, 2, 1, 3});
 }
 
 tensor combine_heads(const tensor& src) {
-  auto t = transpose(src, {1, 0, 2});
-  return reshape(t, {t.shape(0), t.shape(1) * t.shape(2)});
+  auto t = transpose(src, {0, 2, 1, 3});
+  return reshape(t, {t.shape(0), t.shape(1), t.shape(2) * t.shape(3)});
 }
 
 tensor scale(const tensor& src, float scale) {

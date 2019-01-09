@@ -8,6 +8,7 @@
 #include "ref_attention.hpp"
 #include "opt_attention.hpp"
 
+constexpr size_t batch_size = 32;
 constexpr size_t max_seq_len = 256;
 constexpr size_t n_head = 8;
 constexpr size_t d_key = 64;
@@ -24,9 +25,9 @@ int main() {
   std::mt19937 e{rd()};
   std::uniform_real_distribution<float> dist{0, 1};
 
-  tensor q({max_seq_len, d_model});
-  tensor k({max_seq_len, d_model});
-  tensor v({max_seq_len, d_model});
+  tensor q({batch_size, max_seq_len, d_model});
+  tensor k({batch_size, max_seq_len, d_model});
+  tensor v({batch_size, max_seq_len, d_model});
 
   for (int i = 0; i < q.size(); i++) {
     q.ptr()[i] = dist(e);
@@ -40,25 +41,27 @@ int main() {
     v.ptr()[i] = dist(e);
   }
 
-  auto combined_heads = ref_attention_module(q, k, v, max_seq_len, n_head, d_model, d_key);
-  auto opt_combined_heads = opt_attention_module(q, k, v, max_seq_len, n_head, d_model, d_key);
+  auto combined_heads = ref_attention_module(q, k, v, batch_size, max_seq_len, n_head, d_model, d_key);
+  auto opt_combined_heads = opt_attention_module(q, k, v, batch_size, max_seq_len, n_head, d_model, d_key);
 
-  for (size_t m = 0; m < max_seq_len; m++) {
+  for (size_t b = 0; b < batch_size; b++) {
+    for (size_t m = 0; m < max_seq_len; m++) {
       for (size_t d = 0; d < d_model; d++) {
-          auto combined_head = combined_heads.value({m, d});
-          if (are_same(q.value({m, d}), combined_head)) {
-              std::cout << "Incorrect with q\n";
-              std::cout << q.value({m, d}) << " " << combined_head << std::endl;
-              std::terminate();
-          } else if (are_same(k.value({m, d}), combined_head)) {
-              std::cout << "Incorrect with k\n";
-              std::terminate();
-          } else if (are_same(v.value({m, d}), combined_head)) {
-              std::cout << "Incorrect with v\n";
-              std::cout << v.value({m, d}) << " " << combined_head << std::endl;
-              std::terminate();
-          }
+        auto combined_head = combined_heads.value({b, m, d});
+        if (are_same(q.value({b, m, d}), combined_head)) {
+          std::cout << "Incorrect with q\n";
+          std::cout << q.value({b, m, d}) << " " << combined_head << std::endl;
+          std::terminate();
+        } else if (are_same(k.value({b, m, d}), combined_head)) {
+          std::cout << "Incorrect with k\n";
+          std::terminate();
+        } else if (are_same(v.value({b, m, d}), combined_head)) {
+          std::cout << "Incorrect with v\n";
+          std::cout << v.value({b, m, d}) << " " << combined_head << std::endl;
+            std::terminate();
+        }
       }
+    }
   }
 
   if (combined_heads.dims().size() != opt_combined_heads.dims().size()) {
@@ -76,16 +79,18 @@ int main() {
     std::terminate();
   }
 
-  for (size_t m = 0; m < max_seq_len; m++) {
-    for (size_t d = 0; d < d_model; d++) {
-      auto c = combined_heads.value({m, d});
-      auto n = opt_combined_heads.value({m, d});
+  for (size_t b = 0; b < batch_size; b++) {
+    for (size_t m = 0; m < max_seq_len; m++) {
+      for (size_t d = 0; d < d_model; d++) {
+        auto c = combined_heads.value({b, m, d});
+        auto n = opt_combined_heads.value({b, m, d});
 
-      if (!std::isnormal(c) || !are_same(c, n)) {
-        std::cout << "Error: " << m << " " << d << " "
-                  << c << " " << n
-                  << std::endl;
-        std::terminate();
+        if (!std::isnormal(c) || !are_same(c, n)) {
+          std::cout << "Error: " << m << " " << d << " "
+                    << c << " " << n
+                    << std::endl;
+          std::terminate();
+        }
       }
     }
   }

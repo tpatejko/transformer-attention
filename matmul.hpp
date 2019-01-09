@@ -89,7 +89,7 @@ protected:
     int lda = dims_a.transposed ? m : k;
     int ldb = dims_b.transposed ? k : n;
     int ldc = n;
-   
+
     return std::make_tuple(m, n, k, lda, ldb, ldc);
   }
 
@@ -119,7 +119,7 @@ public:
     auto a_desc = create_matrix_descriptor(a.dims(), transpose_a);
     auto b_desc = create_matrix_descriptor(b.dims(), transpose_b);
 
-    tensor c({a_desc.batch_size, a_desc.height, b_desc.width});
+    tensor c({a.dims()[0], a.dims()[1], a_desc.height, b_desc.width});
 
     matmul(a_desc, a.ptr(), b_desc, b.ptr(), c.ptr(), 1.0, 0.0);
 
@@ -137,4 +137,3 @@ tensor matmul(const tensor& a, const tensor& b, arg_ts... args) {
   }
 
 }
-
