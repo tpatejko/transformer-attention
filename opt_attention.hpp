@@ -52,13 +52,15 @@ class qkv_matmul_op {
 
     return c;
   }
-
 };
 
 tensor opt_attention_module(const tensor& q, const tensor& k, const tensor& v,
                             size_t batch_size, size_t max_seq_len, size_t n_head, size_t d_model, size_t d_key) {
   tensor scaled_q = scale(q, 1 / std::sqrt(d_key));
   tensor qk = matmul<qk_matmul_op>(scaled_q, k, batch_size, max_seq_len, n_head, d_model, d_key);
-  tensor combined_heads = matmul<qkv_matmul_op>(qk, v, batch_size, max_seq_len, n_head, d_model, d_key);
+
+  tensor softmax_qk = softmax(reshape(qk, {batch_size*max_seq_len*n_head, max_seq_len}));
+  tensor dropout_qk = dropout(reshape(softmax_qk, {batch_size, max_seq_len, n_head*max_seq_len}), 0.5);
+  tensor combined_heads = matmul<qkv_matmul_op>(dropout_qk, v, batch_size, max_seq_len, n_head, d_model, d_key);
   return combined_heads;
 }

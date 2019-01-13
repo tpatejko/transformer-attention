@@ -44,26 +44,30 @@ int main() {
   auto combined_heads = ref_attention_module(q, k, v, batch_size, max_seq_len, n_head, d_model, d_key);
   auto opt_combined_heads = opt_attention_module(q, k, v, batch_size, max_seq_len, n_head, d_model, d_key);
 
+/*
   for (size_t b = 0; b < batch_size; b++) {
     for (size_t m = 0; m < max_seq_len; m++) {
       for (size_t d = 0; d < d_model; d++) {
         auto combined_head = combined_heads.value({b, m, d});
         if (are_same(q.value({b, m, d}), combined_head)) {
           std::cout << "Incorrect with q\n";
+          std::cout << b << " " << m << " " << d << "\n";
           std::cout << q.value({b, m, d}) << " " << combined_head << std::endl;
           std::terminate();
         } else if (are_same(k.value({b, m, d}), combined_head)) {
           std::cout << "Incorrect with k\n";
+          std::cout << b << " " << m << " " << d << "\n";
           std::terminate();
         } else if (are_same(v.value({b, m, d}), combined_head)) {
           std::cout << "Incorrect with v\n";
+          std::cout << b << " " << m << " " << d << "\n";
           std::cout << v.value({b, m, d}) << " " << combined_head << std::endl;
-            std::terminate();
+          std::terminate();
         }
       }
     }
   }
-
+*/
   if (combined_heads.dims().size() != opt_combined_heads.dims().size()) {
     std::cout << "Sizes incorrect\n";
     std::terminate();
