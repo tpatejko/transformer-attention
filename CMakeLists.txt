@@ -14,6 +14,11 @@ add_definitions(-std=c++17)
 endif()
 endif()
 
+find_library(GFLAGS_LIB NAMES gflags)
+find_path(GFLAGS_INCLUDES NAMES gflags.h PATHS /usr/include/gflags/)
+message("GFLAGS INCLUDES: ${GFLAGS_INCLUDES}")
+include_directories(SYSTEM ${GFLAGS_INCLUDES})
+
 set(EIGENROOT "$ENV{EIGENROOT}")
 set(MKLROOT "$ENV{MKLROOT}")
 
@@ -41,4 +46,4 @@ add_executable(attention attention.cpp)
 add_definitions(-Wall)
 
 #target_link_libraries(attention ${MKL_LIBRARY} )
-target_link_libraries(attention ${MKL_LIBRARY})
+target_link_libraries(attention ${MKL_LIBRARY} ${GFLAGS_LIB})

@@ -6,15 +6,18 @@
 #include <numeric>
 #include <chrono>
 
+#include <gflags/gflags.h>
+
 #include "ref_attention.hpp"
 #include "opt_attention.hpp"
 
-constexpr size_t batch_size = 32;
-constexpr size_t max_seq_len = 256;
-constexpr size_t n_head = 8;
-constexpr size_t d_key = 64;
-constexpr size_t d_value = 64;
-constexpr size_t d_model = n_head * d_key;
+DEFINE_uint64(iterations, 1, "Number of repetitions");
+DEFINE_uint64(batch_size, 32, "Batch size");
+DEFINE_uint64(max_seq_len, 256, "Max sequence length");
+DEFINE_uint64(n_head, 8, "Number of heads");
+DEFINE_uint64(d_key, 64, "Number of keys");
+DEFINE_uint64(d_value, 64, "Number of values");
+
 constexpr float threshold = 1e-7;
 
 using millisec = std::chrono::duration<double, std::milli>;
@@ -62,7 +65,15 @@ bool are_same(float a, float b) {
   return std::fabs(a - b) <= threshold;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
+  auto batch_size = FLAGS_batch_size;
+  auto max_seq_len = FLAGS_max_seq_len;
+  auto n_head = FLAGS_n_head;
+  auto d_key = FLAGS_d_key;
+  auto d_value = FLAGS_d_value;
+  size_t d_model = n_head * d_key;
+
   std::random_device rd;
   std::mt19937 e{rd()};
   std::uniform_real_distribution<float> dist{0, 1};
@@ -119,8 +130,8 @@ int main() {
   std::cout << "Correct\n";
 
   {
-    std::cout << "Average reference time: " << measure_average(10, ref_attention_module, q, k, v, batch_size, max_seq_len, n_head, d_model, d_key).count() << " milliseconds" << std::endl;
-    std::cout << "Average optimized time: " << measure_average(10, opt_attention_module, q, k, v, batch_size, max_seq_len, n_head, d_model, d_key).count() << " milliseconds" << std::endl;
+    std::cout << "Average reference time: " << measure_average(FLAGS_iterations, ref_attention_module, q, k, v, batch_size, max_seq_len, n_head, d_model, d_key).count() << " milliseconds" << std::endl;
+    std::cout << "Average optimized time: " << measure_average(FLAGS_iterations, opt_attention_module, q, k, v, batch_size, max_seq_len, n_head, d_model, d_key).count() << " milliseconds" << std::endl;
   }
 
   return 0;
