@@ -17,6 +17,7 @@ DEFINE_uint64(max_seq_len, 256, "Max sequence length");
 DEFINE_uint64(n_head, 8, "Number of heads");
 DEFINE_uint64(d_key, 64, "Number of keys");
 DEFINE_uint64(d_value, 64, "Number of values");
+DEFINE_bool(validate, false, "Validate correctness");
 
 constexpr float threshold = 1e-7;
 
@@ -65,35 +66,9 @@ bool are_same(float a, float b) {
   return std::fabs(a - b) <= threshold;
 }
 
-int main(int argc, char* argv[]) {
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
-  auto batch_size = FLAGS_batch_size;
-  auto max_seq_len = FLAGS_max_seq_len;
-  auto n_head = FLAGS_n_head;
-  auto d_key = FLAGS_d_key;
-  auto d_value = FLAGS_d_value;
-  size_t d_model = n_head * d_key;
-
-  std::random_device rd;
-  std::mt19937 e{rd()};
-  std::uniform_real_distribution<float> dist{0, 1};
-
-  tensor q({batch_size, max_seq_len, d_model});
-  tensor k({batch_size, max_seq_len, d_model});
-  tensor v({batch_size, max_seq_len, d_model});
-
-  for (int i = 0; i < q.size(); i++) {
-    q.ptr()[i] = dist(e);
-  }
-
-  for (int i = 0; i < k.size(); i++) {
-    k.ptr()[i] = dist(e);
-  }
-
-  for (int i = 0; i < v.size(); i++) {
-    v.ptr()[i] = dist(e);
-  }
-
+void validate(const tensor& q, const tensor& k, const tensor& v,
+              size_t batch_size, size_t max_seq_len, size_t n_head,
+              size_t d_model, size_t d_key) {
   auto combined_heads = ref_attention_module(q, k, v, batch_size, max_seq_len, n_head, d_model, d_key);
   auto opt_combined_heads = opt_attention_module(q, k, v, batch_size, max_seq_len, n_head, d_model, d_key);
 
@@ -128,10 +103,47 @@ int main(int argc, char* argv[]) {
     }
   }
   std::cout << "Correct\n";
+}
+
+int main(int argc, char* argv[]) {
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
+  auto iterations = FLAGS_iterations;
+  auto batch_size = FLAGS_batch_size;
+  auto max_seq_len = FLAGS_max_seq_len;
+  auto n_head = FLAGS_n_head;
+  auto d_key = FLAGS_d_key;
+  auto d_value = FLAGS_d_value;
+  size_t d_model = n_head * d_key;
+
+  std::random_device rd;
+  std::mt19937 e{rd()};
+  std::uniform_real_distribution<float> dist{0, 1};
+
+  tensor q({batch_size, max_seq_len, d_model});
+  tensor k({batch_size, max_seq_len, d_model});
+  tensor v({batch_size, max_seq_len, d_model});
+
+  for (int i = 0; i < q.size(); i++) {
+    q.ptr()[i] = dist(e);
+  }
+
+  for (int i = 0; i < k.size(); i++) {
+    k.ptr()[i] = dist(e);
+  }
+
+  for (int i = 0; i < v.size(); i++) {
+    v.ptr()[i] = dist(e);
+  }
 
   {
-    std::cout << "Average reference time: " << measure_average(FLAGS_iterations, ref_attention_module, q, k, v, batch_size, max_seq_len, n_head, d_model, d_key).count() << " milliseconds" << std::endl;
-    std::cout << "Average optimized time: " << measure_average(FLAGS_iterations, opt_attention_module, q, k, v, batch_size, max_seq_len, n_head, d_model, d_key).count() << " milliseconds" << std::endl;
+    std::cout << "Average reference time: " << measure_average(iterations, ref_attention_module, q, k, v, batch_size, max_seq_len, n_head, d_model, d_key).count() << " milliseconds" << std::endl;
+    std::cout << "Average optimized time: " << measure_average(iterations, opt_attention_module, q, k, v, batch_size, max_seq_len, n_head, d_model, d_key).count() << " milliseconds" << std::endl;
+  }
+
+  {
+    if (FLAGS_validate) {
+      validate(q, k, v, batch_size, max_seq_len, n_head, d_model, d_key);
+    }
   }
 
   return 0;
