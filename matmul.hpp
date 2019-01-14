@@ -72,15 +72,15 @@ protected:
   using transposes_t = std::tuple<CBLAS_TRANSPOSE, CBLAS_TRANSPOSE>;
   using parameters_t = std::tuple<int, int, int, int, int, int>;
 
-  virtual transposes_t transposed(const mat_descriptor& dims_a,
-                                  const mat_descriptor& dims_b) {
+  transposes_t transposed(const mat_descriptor& dims_a,
+                          const mat_descriptor& dims_b) {
     CBLAS_TRANSPOSE a_transposed = dims_a.transposed ? CblasTrans : CblasNoTrans;
     CBLAS_TRANSPOSE b_transposed = dims_b.transposed ? CblasTrans : CblasNoTrans;
 
     return std::make_tuple(a_transposed, b_transposed);
   }
 
-  virtual parameters_t parameters(const mat_descriptor& dims_a,
+  parameters_t parameters(const mat_descriptor& dims_a,
                           const mat_descriptor& dims_b) {
     int m = dims_a.height;
     int n = dims_b.width;
@@ -112,7 +112,7 @@ private:
           m * n, c, ldc);
   }
 
-public:
+ public:
   tensor operator()(const tensor& a, const tensor& b, bool transpose_a, bool transpose_b) {
     auto tensor_rank = a.rank();
 

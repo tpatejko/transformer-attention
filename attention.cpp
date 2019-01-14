@@ -4,6 +4,7 @@
 #include <memory>
 #include <functional>
 #include <numeric>
+#include <chrono>
 
 #include "ref_attention.hpp"
 #include "opt_attention.hpp"
@@ -15,6 +16,47 @@ constexpr size_t d_key = 64;
 constexpr size_t d_value = 64;
 constexpr size_t d_model = n_head * d_key;
 constexpr float threshold = 1e-7;
+
+using millisec = std::chrono::duration<double, std::milli>;
+using experiment_time = millisec;
+
+template<typename func_t, typename... arg_ts>
+experiment_time run_single(func_t f, arg_ts&&... args) {
+  auto s = std::chrono::high_resolution_clock::now();
+  f(std::forward<arg_ts>(args)...);
+  auto e = std::chrono::high_resolution_clock::now();
+
+  return e - s;
+}
+
+template<typename func_t, typename... arg_ts>
+std::vector<experiment_time> run_iterations(size_t iterations, func_t func, arg_ts&&... args) {
+  std::vector<experiment_time> times;
+
+  for (size_t i = 0; i < iterations; i++) {
+    auto t = run_single(func, std::forward<arg_ts>(args)...);
+    times.push_back(t);
+  }
+
+  return times;
+}
+
+experiment_time total_time(const std::vector<experiment_time>& measurements) {
+  return std::accumulate(std::begin(measurements),
+                         std::end(measurements),
+                         experiment_time::zero(),
+                         std::plus<experiment_time>());
+}
+
+experiment_time average_time(const std::vector<experiment_time>& measurements) {
+  auto total = total_time(measurements);
+  return total / measurements.size();
+}
+
+template<typename func_t, typename... arg_ts>
+experiment_time measure_average(size_t iterations, func_t f, arg_ts&&... args) {
+  return average_time(run_iterations(iterations, f, std::forward<arg_ts>(args)...));
+}
 
 bool are_same(float a, float b) {
   return std::fabs(a - b) <= threshold;
@@ -44,30 +86,6 @@ int main() {
   auto combined_heads = ref_attention_module(q, k, v, batch_size, max_seq_len, n_head, d_model, d_key);
   auto opt_combined_heads = opt_attention_module(q, k, v, batch_size, max_seq_len, n_head, d_model, d_key);
 
-/*
-  for (size_t b = 0; b < batch_size; b++) {
-    for (size_t m = 0; m < max_seq_len; m++) {
-      for (size_t d = 0; d < d_model; d++) {
-        auto combined_head = combined_heads.value({b, m, d});
-        if (are_same(q.value({b, m, d}), combined_head)) {
-          std::cout << "Incorrect with q\n";
-          std::cout << b << " " << m << " " << d << "\n";
-          std::cout << q.value({b, m, d}) << " " << combined_head << std::endl;
-          std::terminate();
-        } else if (are_same(k.value({b, m, d}), combined_head)) {
-          std::cout << "Incorrect with k\n";
-          std::cout << b << " " << m << " " << d << "\n";
-          std::terminate();
-        } else if (are_same(v.value({b, m, d}), combined_head)) {
-          std::cout << "Incorrect with v\n";
-          std::cout << b << " " << m << " " << d << "\n";
-          std::cout << v.value({b, m, d}) << " " << combined_head << std::endl;
-          std::terminate();
-        }
-      }
-    }
-  }
-*/
   if (combined_heads.dims().size() != opt_combined_heads.dims().size()) {
     std::cout << "Sizes incorrect\n";
     std::terminate();
@@ -98,7 +116,12 @@ int main() {
       }
     }
   }
-  std::cout << "Done\n";
+  std::cout << "Correct\n";
+
+  {
+    std::cout << "Average reference time: " << measure_average(10, ref_attention_module, q, k, v, batch_size, max_seq_len, n_head, d_model, d_key).count() << " milliseconds" << std::endl;
+    std::cout << "Average optimized time: " << measure_average(10, opt_attention_module, q, k, v, batch_size, max_seq_len, n_head, d_model, d_key).count() << " milliseconds" << std::endl;
+  }
 
   return 0;
 }
