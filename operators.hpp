@@ -5,6 +5,7 @@
 #include <iterator>
 
 #include <unsupported/Eigen/CXX11/Tensor>
+#include <mkldnn.hpp>
 
 #include "tensor.hpp"
 #include "matmul.hpp"
@@ -59,6 +60,68 @@ tensor transpose(const tensor& src, const std::vector<size_t>& orders) {
       shuffle_for_rank<4>(src, dst, orders);
       break;
   }
+
+  return dst;
+}
+
+mkldnn_memory_desc_t memory_descriptor(const std::vector<size_t>& dims,
+                                       const std::vector<size_t>& axis) {
+  mkldnn_memory_desc_t mem_fmt;
+
+  mem_fmt.primitive_kind = mkldnn_memory;
+  mem_fmt.ndims = dims.size();
+
+  for (size_t i = 0; i < dims.size(); i++) {
+    mem_fmt.dims[i] = dims[i];
+  }
+
+  mem_fmt.data_type = mkldnn_f32;
+  mem_fmt.format = mkldnn_blocked;
+
+  size_t total_stride = 1;
+
+  for (int i = dims.size()-1; i >= 0; --i) {
+    mem_fmt.layout_desc.blocking.padding_dims[i] = dims[i];
+    mem_fmt.layout_desc.blocking.block_dims[i] = 1;
+    mem_fmt.layout_desc.blocking.offset_padding_to_data[i] = 0;
+    mem_fmt.layout_desc.blocking.strides[0][axis[i]] = total_stride;
+    mem_fmt.layout_desc.blocking.strides[1][axis[i]] = 1;
+    total_stride *= dims[axis[i]];
+  }
+
+  mem_fmt.layout_desc.blocking.offset_padding = 0;
+  return mem_fmt;
+}
+
+tensor transpose_mkldnn(const tensor& src, const std::vector<size_t>& orders) {
+  std::vector<size_t> dst_dims;
+
+  for (auto o : orders) {
+    dst_dims.push_back(src.dims()[o]);
+  }
+
+  tensor dst{dst_dims};
+  
+  std::vector<size_t> src_orders;
+  for (size_t i = 0; i < src.rank(); i++)
+    src_orders.push_back(i);
+  
+  auto cpu_engine = mkldnn::engine(mkldnn::engine::cpu, 0);
+  
+  auto src_md = memory_descriptor(src.dims(), src_orders);
+  auto src_mdp = mkldnn::memory::primitive_desc(src_md, cpu_engine);
+                                                
+  auto dst_md = memory_descriptor(src.dims(), orders);
+  auto dst_mdp = mkldnn::memory::primitive_desc(dst_md, cpu_engine);
+
+  auto src_memory = mkldnn::memory{src_mdp, src.ptr()};
+  auto dst_memory = mkldnn::memory{dst_mdp, dst.ptr()};
+
+  auto transpose_p = mkldnn::reorder(src_memory, dst_memory);
+
+  std::vector<mkldnn::primitive> pipeline;
+  pipeline.push_back(transpose_p);
+  mkldnn::stream(mkldnn::stream::kind::eager).submit(pipeline).wait();
 
   return dst;
 }

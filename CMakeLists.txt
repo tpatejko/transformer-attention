@@ -21,6 +21,7 @@ include_directories(SYSTEM ${GFLAGS_INCLUDES})
 
 set(EIGENROOT "$ENV{EIGENROOT}")
 set(MKLROOT "$ENV{MKLROOT}")
+set(MKLDNNROOT "$ENV{MKLDNNROOT}")
 
 if(EIGENROOT)
   find_path(EIGEN_INCLUDE_DIR signature_of_eigen3_matrix_library PATHS ${EIGENROOT}/include PATH_SUFFIXES eigen3)
@@ -41,9 +42,20 @@ else()
   message(FATAL "MKL not found")
 endif()
 
+if(MKLDNNROOT)
+  find_path(MKLDNN_INCLUDE_DIR mkldnn.hpp PATHS ${MKLDNNROOT} PATH_SUFFIXES include)
+  find_library(MKLDNN_LIBRARY
+               NAMES mkldnn
+               PATHS ${MKLDNNROOT}/lib)
+  message(STATUS "Found MKLDNN (include: ${MKLDNN_INCLUDE_DIR})")
+  include_directories(${MKLDNN_INCLUDE_DIR})
+else()
+  message(FATAL "MKLDNN not found")
+endif()
+
 add_executable(attention attention.cpp)
 
 add_definitions(-Wall)
 
 #target_link_libraries(attention ${MKL_LIBRARY} )
-target_link_libraries(attention ${MKL_LIBRARY} ${GFLAGS_LIB})
+target_link_libraries(attention ${MKL_LIBRARY} ${MKLDNN_LIBRARY} ${GFLAGS_LIB})
