@@ -66,44 +66,57 @@ bool are_same(float a, float b) {
   return std::fabs(a - b) <= threshold;
 }
 
-void validate(const tensor& q, const tensor& k, const tensor& v,
-              size_t batch_size, size_t max_seq_len, size_t n_head,
-              size_t d_model, size_t d_key) {
-  auto combined_heads = ref_attention_module(q, k, v, batch_size, max_seq_len, n_head, d_model, d_key);
-  auto opt_combined_heads = opt_attention_module(q, k, v, batch_size, max_seq_len, n_head, d_model, d_key);
+class validate_t {
+ public:
+  void operator()(const tensor& q, const tensor& k, const tensor& v,
+                  size_t batch_size, size_t max_seq_len, size_t n_head,
+                  size_t d_model, size_t d_key) {
+    auto combined_heads = ref_attention_module(q, k, v, batch_size, max_seq_len, n_head, d_model, d_key);
+    auto mkldnn_combined_heads = ref_mkldnn_attention_module(q, k, v, batch_size, max_seq_len, n_head, d_model, d_key);
+    auto opt_combined_heads = opt_attention_module(q, k, v, batch_size, max_seq_len, n_head, d_model, d_key);
 
-  if (combined_heads.dims().size() != opt_combined_heads.dims().size()) {
-    std::cout << "Sizes incorrect\n";
-    std::terminate();
+    std::cout << "Check ref vs. mkldnn: ";
+    validate(combined_heads, mkldnn_combined_heads, batch_size, max_seq_len, d_model);
+
+    std::cout << "Check ref vs. opt: ";
+    validate(combined_heads, opt_combined_heads, batch_size, max_seq_len, d_model);
   }
 
-  if (combined_heads.dims() != opt_combined_heads.dims()) {
-    std::cout << "Dims incorrect\n";
-    std::copy(std::begin(combined_heads.dims()), std::end(combined_heads.dims()),
-              std::ostream_iterator<size_t>(std::cout, " "));
-    std::cout << "\n";
-    std::copy(std::begin(opt_combined_heads.dims()), std::end(opt_combined_heads.dims()),
-              std::ostream_iterator<size_t>(std::cout, " "));
-    std::terminate();
-  }
+  void validate(const tensor& lhs, const tensor& rhs,
+                size_t batch_size, size_t max_seq_len, size_t d_model) {
+    if (lhs.dims().size() != rhs.dims().size()) {
+      std::cout << "Sizes incorrect\n";
+      std::terminate();
+    }
 
-  for (size_t b = 0; b < batch_size; b++) {
-    for (size_t m = 0; m < max_seq_len; m++) {
-      for (size_t d = 0; d < d_model; d++) {
-        auto c = combined_heads.value({b, m, d});
-        auto n = opt_combined_heads.value({b, m, d});
+    if (lhs.dims() != rhs.dims()) {
+      std::cout << "Dims incorrect\n";
+      std::copy(std::begin(lhs.dims()), std::end(lhs.dims()),
+                std::ostream_iterator<size_t>(std::cout, " "));
+      std::cout << "\n";
+      std::copy(std::begin(rhs.dims()), std::end(rhs.dims()),
+                std::ostream_iterator<size_t>(std::cout, " "));
+      std::terminate();
+    }
 
-        if (!std::isnormal(c) || !are_same(c, n)) {
-          std::cout << "Error: " << m << " " << d << " "
-                    << c << " " << n
-                    << std::endl;
-          std::terminate();
+    for (size_t b = 0; b < batch_size; b++) {
+      for (size_t m = 0; m < max_seq_len; m++) {
+        for (size_t d = 0; d < d_model; d++) {
+          auto l = lhs.value({b, m, d});
+          auto r = rhs.value({b, m, d});
+
+          if (!std::isnormal(l) || !are_same(l, r)) {
+            std::cout << "Error: " << m << " " << d << " "
+                      << l << " " << r
+                      << std::endl;
+            std::terminate();
+          }
         }
       }
     }
+    std::cout << "Correct\n";
   }
-  std::cout << "Correct\n";
-}
+};
 
 int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
@@ -144,7 +157,8 @@ int main(int argc, char* argv[]) {
 
   {
     if (FLAGS_validate) {
-      validate(q, k, v, batch_size, max_seq_len, n_head, d_model, d_key);
+      validate_t val;
+      val(q, k, v, batch_size, max_seq_len, n_head, d_model, d_key);
     }
   }
 
