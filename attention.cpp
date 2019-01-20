@@ -149,9 +149,16 @@ int main(int argc, char* argv[]) {
   }
 
   {
+    std::cout << "Iterations: " << iterations << std::endl;
+    std::cout << "Batch size: " << batch_size << std::endl;
+    std::cout << "Max sequence length: " << max_seq_len << std::endl;
+    std::cout << "Number of heads: " << n_head << std::endl;
+    std::cout << "Model depth: " << d_model << std::endl;
+    std::cout << "Number of keys: " << d_key << std::endl;
+    std::cout << "Number of values: " << d_value << std::endl;
+    
     std::cout << "Average reference time: " << measure_average(iterations, ref_attention_module, q, k, v, batch_size, max_seq_len, n_head, d_model, d_key).count() << " milliseconds" << std::endl;
     std::cout << "Average mkldnn reference time: " << measure_average(iterations, ref_mkldnn_attention_module, q, k, v, batch_size, max_seq_len, n_head, d_model, d_key).count() << " milliseconds" << std::endl;
-
     std::cout << "Average optimized time: " << measure_average(iterations, opt_attention_module, q, k, v, batch_size, max_seq_len, n_head, d_model, d_key).count() << " milliseconds" << std::endl;
   }
 
