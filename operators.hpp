@@ -102,10 +102,9 @@ tensor transpose_mkldnn(const tensor& src, const std::vector<size_t>& orders) {
 
   tensor dst{dst_dims};
   
-  std::vector<size_t> src_orders;
-  for (size_t i = 0; i < src.rank(); i++)
-    src_orders.push_back(i);
-  
+  std::vector<size_t> src_orders(src.rank(), 0);
+  std::iota(std::begin(src_orders), std::end(src_orders), 0);
+
   auto cpu_engine = mkldnn::engine(mkldnn::engine::cpu, 0);
   
   auto src_md = memory_descriptor(src.dims(), src_orders);
